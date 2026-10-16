@@ -126,3 +126,7 @@ Include your Android version, the app version, what you did, what you expected, 
 ## **License**
 
 Uses my [No Fault License](https://github.com/ZoKLav/no_fault_license). Don't fuck it up for yourself.
+
+<img src="/screenshots/3.png" width="640" alt="Screenshot 1">
+<img src="/screenshots/2.png" width="640" alt="Screenshot 2">
+<img src="/screenshots/1.png" width="640" alt="Screenshot 3">
