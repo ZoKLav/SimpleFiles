@@ -73,6 +73,10 @@ Select your files, open the menu, and do the thing.
 
 ## Changelog
 
+### 1.1.1
+
+- Added file picker function
+
 ### 1.1.0
 
 #### Added
