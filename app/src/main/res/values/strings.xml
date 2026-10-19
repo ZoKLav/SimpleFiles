@@ -1,1 +1,2 @@
-<resources><string name="app_name">SimpleFiles</string></resources>
+<resources><string name="app_name">SimpleFiles</string>    <string name="picker_label">SimpleFiles picker</string>
+</resources>

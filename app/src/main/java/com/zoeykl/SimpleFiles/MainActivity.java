@@ -28,6 +28,8 @@ public class MainActivity extends Activity {
     private SharedPreferences prefs;
     private File current,base;
     private boolean homeView=true,clipboardCut=false,grid=false,dark=false,rootMode=false,showHidden=false,descending=false;
+    private boolean pickerMode=false, pickerMultiple=false, pickerDocuments=false;
+    private String[] pickerMimeTypes={"*/*"};
     private int activeTab=0,sort=0,accent=0xff4169e1;
     private final String[] sortNames={"Name","Date modified","Size","Type"};
     private final ArrayList<BrowseTab> tabs=new ArrayList<>();
@@ -46,7 +48,19 @@ public class MainActivity extends Activity {
     @Override public void onCreate(Bundle state){
         prefs=getSharedPreferences("prefs",0);dark=prefs.getBoolean("dark",false);
         setTheme(dark?android.R.style.Theme_Material_NoActionBar:android.R.style.Theme_Material_Light_NoActionBar);
-        super.onCreate(state);base=Environment.getExternalStorageDirectory();if(base==null)base=new File("/");current=base;loadPrefs();
+        super.onCreate(state);
+        String action=getIntent().getAction();
+        pickerMode=this instanceof PickerActivity &&
+                (Intent.ACTION_GET_CONTENT.equals(action) || Intent.ACTION_OPEN_DOCUMENT.equals(action) || Intent.ACTION_PICK.equals(action));
+        if(pickerMode){
+            pickerDocuments=Intent.ACTION_OPEN_DOCUMENT.equals(action);
+            pickerMultiple=getIntent().getBooleanExtra(Intent.EXTRA_ALLOW_MULTIPLE,false);
+            String[] requested=getIntent().getStringArrayExtra(Intent.EXTRA_MIME_TYPES);
+            String fallback=getIntent().getType();
+            if(requested!=null && requested.length>0)pickerMimeTypes=requested;
+            else pickerMimeTypes=new String[]{fallback==null?"*/*":fallback};
+        }
+        base=Environment.getExternalStorageDirectory();if(base==null)base=new File("/");current=base;loadPrefs();
         if(state!=null){
             int count=state.getInt("tabCount",0);
             for(int i=0;i<count;i++){ArrayList<String> history=state.getStringArrayList("history"+i);if(history==null||history.isEmpty())continue;BrowseTab t=new BrowseTab("");t.history=history;t.position=Math.min(state.getInt("position"+i),history.size()-1);tabs.add(t);}
@@ -54,6 +68,7 @@ public class MainActivity extends Activity {
             ArrayList<String> clips=state.getStringArrayList("clipboard");if(clips!=null)for(String path:clips)clipboard.add(new File(path));clipboardCut=state.getBoolean("cut");
             ArrayList<String> selection=state.getStringArrayList("selection");if(selection!=null)for(String path:selection)selected.add(new File(path));
         }
+        if(pickerMode){rootMode=false;clipboard.clear();if(state==null)selected.clear();}
         if(tabs.isEmpty())tabs.add(new BrowseTab(startupLocation()));
         restoreLocation();buildUi();render();requestStorage();
     }
@@ -76,7 +91,7 @@ public class MainActivity extends Activity {
         toolbar=new LinearLayout(this);toolbar.setOrientation(1);toolbar.setBackgroundColor(surface());root.addView(toolbar);
         LinearLayout top=new LinearLayout(this);top.setGravity(Gravity.CENTER_VERTICAL);top.setPadding(dp(16),0,dp(4),0);toolbar.addView(top);
         title=text("SimpleFiles",21,true);title.setSingleLine(true);title.setEllipsize(android.text.TextUtils.TruncateAt.END);top.addView(title,new LinearLayout.LayoutParams(0,dp(56),1));title.setGravity(Gravity.CENTER_VERTICAL);
-        button(top,"⌕","Search folder",()->search());overflow=button(top,"⋮","Actions",()->menu());
+        button(top,pickerMode?"×":"⌕",pickerMode?"Cancel selection":"Search folder",()->{if(pickerMode){setResult(RESULT_CANCELED);finish();}else search();});overflow=button(top,"⋮","Actions",()->menu());
         HorizontalScrollView tabScroll=new HorizontalScrollView(this);tabScroll.setHorizontalScrollBarEnabled(false);tabsBar=new LinearLayout(this);tabsBar.setPadding(dp(8),0,dp(8),0);tabScroll.addView(tabsBar);toolbar.addView(tabScroll,new LinearLayout.LayoutParams(-1,dp(48)));
         LinearLayout navigation=new LinearLayout(this);navigation.setGravity(Gravity.CENTER_VERTICAL);toolbar.addView(navigation);
         backButton=button(navigation,"←","Back",()->history(-1));forwardButton=button(navigation,"→","Forward",()->history(1));upButton=button(navigation,"↑","Parent folder",()->up());button(navigation,"⌂","Home",()->goHome());
@@ -85,7 +100,7 @@ public class MainActivity extends Activity {
         ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);listHost=new LinearLayout(this);listHost.setOrientation(1);listHost.setPadding(dp(8),dp(8),dp(8),dp(12));scroll.addView(listHost);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
         bottomBar=new LinearLayout(this);bottomBar.setPadding(dp(14),dp(8),dp(14),dp(8));bottomBar.setGravity(Gravity.CENTER_VERTICAL);bottomBar.setBackgroundColor(surface());root.addView(bottomBar,new LinearLayout.LayoutParams(-1,-2));
     }
-    private void render(){if(root==null)return;visibleFiles=homeView?new ArrayList<>():files();selected.retainAll(visibleFiles);title.setText(selected.isEmpty()?(homeView?"Home":shortName(current)):selected.size()+" selected");pathLabel.setText(homeView?"Home":current.getAbsolutePath());renderTabs();renderBreadcrumbs();renderFiles();renderBottom();BrowseTab t=tabs.get(activeTab);backButton.setEnabled(t.position>0);backButton.setAlpha(t.position>0?1f:.3f);forwardButton.setEnabled(t.position<t.history.size()-1);forwardButton.setAlpha(forwardButton.isEnabled()?1f:.3f);upButton.setEnabled(!homeView&&current.getParentFile()!=null);upButton.setAlpha(upButton.isEnabled()?1f:.3f);}
+    private void render(){if(root==null)return;visibleFiles=homeView?new ArrayList<>():files();selected.retainAll(visibleFiles);title.setText(pickerMode?(pickerMultiple?"Choose files":"Choose a file"):(selected.isEmpty()?(homeView?"Home":shortName(current)):selected.size()+" selected"));pathLabel.setText(homeView?"Home":current.getAbsolutePath());renderTabs();renderBreadcrumbs();renderFiles();renderBottom();BrowseTab t=tabs.get(activeTab);backButton.setEnabled(t.position>0);backButton.setAlpha(t.position>0?1f:.3f);forwardButton.setEnabled(t.position<t.history.size()-1);forwardButton.setAlpha(forwardButton.isEnabled()?1f:.3f);upButton.setEnabled(!homeView&&current.getParentFile()!=null);upButton.setAlpha(upButton.isEnabled()?1f:.3f);}
     private void renderTabs(){tabsBar.removeAllViews();for(int i=0;i<tabs.size();i++){final int at=i;LinearLayout tab=new LinearLayout(this);tab.setGravity(Gravity.CENTER_VERTICAL);GradientDrawable border=shape(i==activeTab?bg():surface(),dp(5));if(i==activeTab)border.setStroke(dp(1),accent);tab.setBackground(border);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-2,dp(40));lp.setMargins(dp(3),dp(4),dp(3),dp(4));tabsBar.addView(tab,lp);TextView name=text(tabs.get(i).path().isEmpty()?"Home":shortName(new File(tabs.get(i).path())),13,i==activeTab);name.setPadding(dp(12),0,dp(12),0);name.setGravity(Gravity.CENTER);tab.addView(name,new LinearLayout.LayoutParams(-2,-1));name.setOnClickListener(v->{activeTab=at;selected.clear();restoreLocation();render();});if(tabs.size()>1){TextView close=text("×",20,false);close.setGravity(Gravity.CENTER);close.setContentDescription("Close tab");tab.addView(close,new LinearLayout.LayoutParams(dp(40),-1));close.setOnClickListener(v->{tabs.remove(at);if(at<activeTab)activeTab--;activeTab=Math.min(activeTab,tabs.size()-1);selected.clear();restoreLocation();render();});}}
         button(tabsBar,"+","New tab",()->newTab());}
     private void renderBreadcrumbs(){breadcrumbs.removeAllViews();crumb("Home","");if(homeView)return;ArrayList<File> chain=new ArrayList<>();File f=current;while(f!=null){chain.add(0,f);if(f.equals(base))break;f=f.getParentFile();}for(File part:chain)crumb(shortName(part),part.getAbsolutePath());}
@@ -102,10 +117,11 @@ public class MainActivity extends Activity {
     @Override public void onBackPressed(){if(!selected.isEmpty()){selected.clear();render();}else if(tabs.get(activeTab).position>0)history(-1);else if(!homeView)navigate("");else super.onBackPressed();}
     private void address(){EditText e=input("Absolute folder path");e.setText(current.getAbsolutePath());AlertDialog d=new AlertDialog.Builder(this).setTitle("Go to folder").setView(e).setNegativeButton("Cancel",null).setPositiveButton("Open",null).create();d.setOnShowListener(v->d.getButton(-1).setOnClickListener(w->{File f=new File(e.getText().toString().trim());if(!f.isAbsolute()||(!rootMode&&!f.isDirectory())){e.setError("Enter an existing absolute folder path");return;}d.dismiss();navigate(f.getAbsolutePath());}));d.show();}
     private ArrayList<File> files(){ArrayList<File> out=new ArrayList<>();if(rootMode){try{rootDirectories.clear();String s=runRoot("ls -1Ap "+q(current.getAbsolutePath()));for(String line:s.split("\\n")){if(line.trim().isEmpty()||line.startsWith("total "))continue;boolean dir=line.endsWith("/");String name=dir?line.substring(0,line.length()-1):line;if(name.startsWith(".")&&!showHidden)continue;File item=new File(current,name);if(dir)rootDirectories.add(item.getAbsolutePath());out.add(item);}}catch(Exception ignored){}}else{File[] fs=current.listFiles();if(fs!=null)for(File f:fs)if(showHidden||!f.isHidden())out.add(f);}
+        if(pickerMode)out.removeIf(f->!isDir(f)&&(!f.isFile()||!pickerMimeMatches(f)));
         Collections.sort(out,(a,b)->{if(isDir(a)!=isDir(b))return isDir(a)?-1:1;int result;switch(sort){case 1:result=Long.compare(a.lastModified(),b.lastModified());break;case 2:result=Long.compare(size(a),size(b));break;case 3:result=ext(a).compareToIgnoreCase(ext(b));break;default:result=a.getName().compareToIgnoreCase(b.getName());}if(result==0)result=a.getName().compareToIgnoreCase(b.getName());return descending?-result:result;});return out;}
     private void renderFiles(){listHost.removeAllViews();if(homeView){renderHome();return;}
         if(!grid){LinearLayout header=new LinearLayout(this);header.setPadding(dp(14),0,dp(14),0);listHost.addView(header);TextView name=text("Name"+(sort==0?(descending?" ↓":" ↑"):""),12,true);name.setTextColor(muted());header.addView(name,new LinearLayout.LayoutParams(0,dp(36),1));name.setGravity(Gravity.CENTER_VERTICAL);name.setOnClickListener(v->setSort(0));TextView other=text(sortNames[sort]+(descending?" ↓":" ↑"),12,false);other.setTextColor(muted());other.setGravity(Gravity.CENTER_VERTICAL);header.addView(other,new LinearLayout.LayoutParams(-2,dp(36)));other.setOnClickListener(v->chooseSort());}
-        if(visibleFiles.isEmpty()){TextView empty=text(current.canRead()?"This folder is empty":"This folder is unavailable. Check storage access or choose another location.",15,false);empty.setGravity(Gravity.CENTER);empty.setPadding(dp(20),dp(72),dp(20),dp(72));listHost.addView(empty);return;}
+        if(visibleFiles.isEmpty()){TextView empty=text(current.canRead()?(pickerMode?"No files of the requested type in this folder":"This folder is empty"):"This folder is unavailable. Check storage access or choose another location.",15,false);empty.setGravity(Gravity.CENTER);empty.setPadding(dp(20),dp(72),dp(20),dp(72));listHost.addView(empty);return;}
         if(grid){int columns=Math.max(2,getResources().getConfiguration().screenWidthDp/150);for(int i=0;i<visibleFiles.size();i+=columns){LinearLayout row=new LinearLayout(this);listHost.addView(row);for(int j=0;j<columns;j++){LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(156),1);lp.setMargins(dp(3),dp(3),dp(3),dp(3));row.addView(i+j<visibleFiles.size()?card(visibleFiles.get(i+j),true):new View(this),lp);}}}
         else for(File f:visibleFiles){LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(72));lp.bottomMargin=dp(1);listHost.addView(card(f,false),lp);}
     }
@@ -114,12 +130,38 @@ public class MainActivity extends Activity {
         LinearLayout box=new LinearLayout(this);box.setOrientation(asGrid?1:0);box.setGravity(Gravity.CENTER_VERTICAL);box.setPadding(dp(8),dp(5),dp(5),dp(5));GradientDrawable background=shape(selected.contains(f)?Appearance.blend(accent,surface(),.84f):surface(),dp(4));if(selected.contains(f))background.setStroke(dp(1),accent);box.setBackground(background);box.setAlpha(clipboardCut&&clipboard.contains(f)?.5f:1f);
         ImageView icon=new ImageView(this);icon.setScaleType(ImageView.ScaleType.CENTER_INSIDE);icon.setImageDrawable(new FileIcon(isDir(f),ext(f),appearance.color(isDir(f)?"folderColor":"fileColor")));icon.setContentDescription(isDir(f)?"Folder":"File");
         if(prefs.getBoolean("thumbnails",true)&&isImage(f)&&f.isFile()&&!rootMode){try{BitmapFactory.Options o=new BitmapFactory.Options();o.inJustDecodeBounds=true;BitmapFactory.decodeFile(f.getAbsolutePath(),o);int sample=1;while(Math.max(o.outWidth,o.outHeight)/sample>192)sample*=2;o.inSampleSize=sample;o.inJustDecodeBounds=false;Bitmap bitmap=BitmapFactory.decodeFile(f.getAbsolutePath(),o);if(bitmap!=null)icon.setImageBitmap(bitmap);}catch(Exception ignored){}}
-        if(asGrid){LinearLayout tools=new LinearLayout(this);TextView tick=text(selected.contains(f)?"✓":"□",17,true);tick.setTextColor(accent);tools.addView(tick,new LinearLayout.LayoutParams(0,dp(32),1));tick.setContentDescription("Select "+f.getName());tick.setOnClickListener(v->toggleSelection(f));TextView dots=text("⋮",21,true);dots.setGravity(Gravity.CENTER);dots.setTextColor(appearance.color("toolbarColor"));dots.setContentDescription("Actions for "+f.getName());tools.addView(dots,new LinearLayout.LayoutParams(dp(48),dp(32)));box.addView(tools);dots.setOnClickListener(v->fileMenu(f,dots));box.addView(icon,new LinearLayout.LayoutParams(-1,dp(62)));TextView name=text(displayName(f),13,false);name.setMaxLines(2);name.setGravity(Gravity.CENTER);name.setEllipsize(android.text.TextUtils.TruncateAt.END);box.addView(name,new LinearLayout.LayoutParams(-1,0,1));}
-        else {TextView tick=text(selected.contains(f)?"✓":"□",16,true);tick.setTextColor(accent);tick.setGravity(Gravity.CENTER);tick.setContentDescription("Select "+f.getName());box.addView(tick,new LinearLayout.LayoutParams(dp(28),-1));tick.setOnClickListener(v->toggleSelection(f));box.addView(icon,new LinearLayout.LayoutParams(dp(40),dp(44)));LinearLayout labels=new LinearLayout(this);labels.setOrientation(1);labels.setGravity(Gravity.CENTER_VERTICAL);labels.setPadding(dp(10),0,0,0);box.addView(labels,new LinearLayout.LayoutParams(0,-1,1));TextView name=text(displayName(f),15,false);name.setSingleLine(true);name.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);labels.addView(name);TextView meta=text((isDir(f)?"Folder":pretty(size(f)))+"  ·  "+date(f.lastModified()),11,false);meta.setSingleLine(true);meta.setEllipsize(android.text.TextUtils.TruncateAt.END);meta.setTextColor(muted());labels.addView(meta);TextView dots=text("⋮",23,true);dots.setGravity(Gravity.CENTER);dots.setTextColor(appearance.color("toolbarColor"));dots.setContentDescription("Actions for "+f.getName());box.addView(dots,new LinearLayout.LayoutParams(dp(48),-1));dots.setOnClickListener(v->fileMenu(f,dots));}
-        box.setOnClickListener(v->{if(!selected.isEmpty())toggleSelection(f);else open(f);});box.setOnLongClickListener(v->{toggleSelection(f);return true;});return box;
+        if(asGrid){LinearLayout tools=new LinearLayout(this);TextView tick=text(pickerMode&&isDir(f)?"›":(selected.contains(f)?"✓":"□"),17,true);tick.setTextColor(accent);tools.addView(tick,new LinearLayout.LayoutParams(0,dp(32),1));tick.setContentDescription("Select "+f.getName());tick.setOnClickListener(v->toggleSelection(f));TextView dots=text("⋮",21,true);dots.setGravity(Gravity.CENTER);dots.setTextColor(appearance.color("toolbarColor"));dots.setContentDescription("Actions for "+f.getName());tools.addView(dots,new LinearLayout.LayoutParams(dp(48),dp(32)));box.addView(tools);dots.setOnClickListener(v->fileMenu(f,dots));box.addView(icon,new LinearLayout.LayoutParams(-1,dp(62)));TextView name=text(displayName(f),13,false);name.setMaxLines(2);name.setGravity(Gravity.CENTER);name.setEllipsize(android.text.TextUtils.TruncateAt.END);box.addView(name,new LinearLayout.LayoutParams(-1,0,1));}
+        else {TextView tick=text(pickerMode&&isDir(f)?"›":(selected.contains(f)?"✓":"□"),16,true);tick.setTextColor(accent);tick.setGravity(Gravity.CENTER);tick.setContentDescription("Select "+f.getName());box.addView(tick,new LinearLayout.LayoutParams(dp(28),-1));tick.setOnClickListener(v->toggleSelection(f));box.addView(icon,new LinearLayout.LayoutParams(dp(40),dp(44)));LinearLayout labels=new LinearLayout(this);labels.setOrientation(1);labels.setGravity(Gravity.CENTER_VERTICAL);labels.setPadding(dp(10),0,0,0);box.addView(labels,new LinearLayout.LayoutParams(0,-1,1));TextView name=text(displayName(f),15,false);name.setSingleLine(true);name.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);labels.addView(name);TextView meta=text((isDir(f)?"Folder":pretty(size(f)))+"  ·  "+date(f.lastModified()),11,false);meta.setSingleLine(true);meta.setEllipsize(android.text.TextUtils.TruncateAt.END);meta.setTextColor(muted());labels.addView(meta);TextView dots=text("⋮",23,true);dots.setGravity(Gravity.CENTER);dots.setTextColor(appearance.color("toolbarColor"));dots.setContentDescription("Actions for "+f.getName());box.addView(dots,new LinearLayout.LayoutParams(dp(48),-1));dots.setOnClickListener(v->fileMenu(f,dots));}
+        box.setOnClickListener(v->{if(pickerMode)open(f);else if(!selected.isEmpty())toggleSelection(f);else open(f);});box.setOnLongClickListener(v->{toggleSelection(f);return true;});return box;
     }
-    private void toggleSelection(File f){if(!selected.remove(f))selected.add(f);render();}
-    private void renderBottom(){bottomBar.removeAllViews();String status=homeView?"Home":visibleFiles.size()+" items";if(!selected.isEmpty())status+=" · "+selected.size()+" selected";if(!clipboard.isEmpty())status+=" · "+clipboard.size()+(clipboardCut?" to move":" copied");if(rootMode)status+=" · Root";TextView t=text(status,12,false);t.setTextColor(muted());bottomBar.addView(t);}
+    private void toggleSelection(File f){
+        if(pickerMode){
+            if(isDir(f)){navigate(f.getAbsolutePath());return;}
+            if(!pickerMimeMatches(f)){toast("This file type wasn't requested");return;}
+            if(!pickerMultiple){finishPicking(Collections.singletonList(f));return;}
+        }
+        if(!selected.remove(f))selected.add(f);render();
+    }
+    private void renderBottom(){
+        bottomBar.removeAllViews();
+        if(pickerMode){
+            TextView hint=text(pickerMultiple?(selected.size()+" selected"):"Tap a file to choose",13,false);
+            hint.setTextColor(muted());hint.setGravity(Gravity.CENTER_VERTICAL);
+            bottomBar.addView(hint,new LinearLayout.LayoutParams(0,dp(48),1));
+            if(pickerMultiple){
+                TextView add=text("Add ("+selected.size()+")",14,true);
+                add.setTextColor(appearance.color("toolbarColor"));add.setGravity(Gravity.CENTER);
+                add.setContentDescription("Add selected files to the requesting app");
+                add.setEnabled(!selected.isEmpty());add.setAlpha(selected.isEmpty()?.4f:1f);
+                bottomBar.addView(add,new LinearLayout.LayoutParams(dp(104),dp(48)));
+                add.setOnClickListener(v->finishPicking(new ArrayList<>(selected)));
+            }
+            TextView cancel=text("Cancel",14,true);cancel.setTextColor(appearance.color("toolbarColor"));cancel.setGravity(Gravity.CENTER);
+            bottomBar.addView(cancel,new LinearLayout.LayoutParams(dp(80),dp(48)));
+            cancel.setOnClickListener(v->{setResult(RESULT_CANCELED);finish();});
+            return;
+        }
+        String status=homeView?"Home":visibleFiles.size()+" items";if(!selected.isEmpty())status+=" · "+selected.size()+" selected";if(!clipboard.isEmpty())status+=" · "+clipboard.size()+(clipboardCut?" to move":" copied");if(rootMode)status+=" · Root";TextView t=text(status,12,false);t.setTextColor(muted());bottomBar.addView(t);}
     private void homeHeading(String name){TextView t=text(name,15,true);t.setPadding(dp(10),dp(16),dp(10),dp(12));listHost.addView(t);}
     private void renderHome(){homeHeading("Locations");homeShortcut("Internal storage",base);if(prefs.getBoolean("homeCommon",true)){homeHeading("Quick access");for(String name:new String[]{"Download","Documents","DCIM","Pictures","Music","Movies"})homeShortcut(name.equals("Download")?"Downloads":name.equals("DCIM")?"Camera":name,new File(base,name));}
         ArrayList<String> pinned=new ArrayList<>(prefs.getStringSet("pinned",Collections.emptySet()));Collections.sort(pinned);homeHeading("Pinned folders");if(pinned.isEmpty()){TextView hint=text("Pin a folder from its three-dot menu to keep it here.",13,false);hint.setTextColor(muted());hint.setPadding(dp(10),0,dp(10),dp(16));listHost.addView(hint);}for(String path:pinned)homeShortcut(shortName(new File(path)),new File(path));}
@@ -132,7 +174,15 @@ public class MainActivity extends Activity {
         addMenu(menu,"Cut",any,()->putClipboard(targets,true));addMenu(menu,"Copy",any,()->putClipboard(targets,false));
         addMenu(menu,"Rename",one,()->rename(targets.get(0)));addMenu(menu,"Delete",any,()->confirmDelete(targets));boolean sharable=any;for(File f:targets)if(isDir(f))sharable=false;addMenu(menu,"Share",sharable,()->shareFiles(targets));addMenu(menu,"Properties",one,()->details(targets.get(0)));
     }
-    private void menu(){PopupMenu popup=new PopupMenu(this,overflow);Menu m=popup.getMenu();selectionActions(m,new ArrayList<>(selected));addMenu(m,"Paste"+(clipboard.isEmpty()?"":" ("+clipboard.size()+")"),!homeView&&!clipboard.isEmpty(),()->paste());
+    private void menu(){
+        if(pickerMode){
+            PopupMenu popup=new PopupMenu(this,overflow);Menu menu=popup.getMenu();
+            addMenu(menu,"Refresh",true,()->render());
+            addMenu(menu,showHidden?"Hide hidden files":"Show hidden files",true,()->{showHidden=!showHidden;savePrefs();render();});
+            addMenu(menu,"Storage access",true,()->requestStorage());
+            popup.show();return;
+        }
+        PopupMenu popup=new PopupMenu(this,overflow);Menu m=popup.getMenu();selectionActions(m,new ArrayList<>(selected));addMenu(m,"Paste"+(clipboard.isEmpty()?"":" ("+clipboard.size()+")"),!homeView&&!clipboard.isEmpty(),()->paste());
         addMenu(m,"Select all",!homeView&&!visibleFiles.isEmpty(),()->{selected.addAll(visibleFiles);render();});addMenu(m,"Clear selection",!selected.isEmpty(),()->{selected.clear();render();});addMenu(m,"Clear clipboard",!clipboard.isEmpty(),()->{clipboard.clear();render();});
         addMenu(m,"New folder",!homeView,()->newFolder());addMenu(m,"New tab",true,()->newTab());addMenu(m,"Refresh",true,()->render());
         Menu view=m.addSubMenu("View");addMenu(view,"Details list",true,()->{grid=false;savePrefs();render();}).setCheckable(true).setChecked(!grid);addMenu(view,"Large icons",true,()->{grid=true;savePrefs();render();}).setCheckable(true).setChecked(grid);
@@ -140,9 +190,53 @@ public class MainActivity extends Activity {
         addMenu(m,"Pin this folder to Home",!homeView,()->{Set<String> pins=new HashSet<>(prefs.getStringSet("pinned",Collections.emptySet()));pins.add(current.getAbsolutePath());prefs.edit().putStringSet("pinned",pins).apply();toast("Pinned to Home");});
         addMenu(m,"Go to folder…",true,()->address());addMenu(m,"Open folder picker…",true,()->pickTree());addMenu(m,rootMode?"Disable root mode":"Enable root mode",true,()->toggleRoot());addMenu(m,"Storage access",true,()->requestStorage());addMenu(m,"Settings",true,()->{Intent intent=new Intent(this,SettingsActivity.class);if(!homeView)intent.putExtra("currentFolder",current.getAbsolutePath());startActivity(intent);});popup.show();
     }
-    private void fileMenu(File f,View anchor){List<File> targets=selected.contains(f)?new ArrayList<>(selected):Collections.singletonList(f);PopupMenu popup=new PopupMenu(this,anchor);Menu m=popup.getMenu();addMenu(m,"Open",targets.size()==1,()->open(f));if(isDir(f)){addMenu(m,"Paste into folder",!clipboard.isEmpty(),()->{navigate(f.getAbsolutePath());paste();});addMenu(m,"Open in new tab",true,()->openTab(f));addMenu(m,isPinned(f)?"Unpin from Home":"Pin to Home",true,()->pin(f));}selectionActions(m,targets);addMenu(m,selected.contains(f)?"Deselect":"Select",true,()->toggleSelection(f));popup.show();}
+    private void fileMenu(File f,View anchor){
+        if(pickerMode){
+            PopupMenu popup=new PopupMenu(this,anchor);
+            addMenu(popup.getMenu(),isDir(f)?"Open folder":(pickerMultiple?"Select file":"Choose file"),true,()->open(f));
+            popup.show();return;
+        }
+        List<File> targets=selected.contains(f)?new ArrayList<>(selected):Collections.singletonList(f);PopupMenu popup=new PopupMenu(this,anchor);Menu m=popup.getMenu();addMenu(m,"Open",targets.size()==1,()->open(f));if(isDir(f)){addMenu(m,"Paste into folder",!clipboard.isEmpty(),()->{navigate(f.getAbsolutePath());paste();});addMenu(m,"Open in new tab",true,()->openTab(f));addMenu(m,isPinned(f)?"Unpin from Home":"Pin to Home",true,()->pin(f));}selectionActions(m,targets);addMenu(m,selected.contains(f)?"Deselect":"Select",true,()->toggleSelection(f));popup.show();}
     private void putClipboard(List<File> targets,boolean cut){clipboard=new ArrayList<>(targets);clipboardCut=cut;selected.clear();toast(clipboard.size()+(cut?" item(s) ready to move":" item(s) copied"));render();}
-    private void open(File f){if(isDir(f)){navigate(f.getAbsolutePath());return;}if(ext(f).equals("zip")){showZip(f);return;}if(isText(f)){previewText(f);return;}try{Intent i=new Intent(Intent.ACTION_VIEW);i.setDataAndType(fileUri(f),mime(f));i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivity(i);}catch(Exception e){toast("No app can open this file");}}
+    private void open(File f){
+        if(pickerMode){
+            if(isDir(f))navigate(f.getAbsolutePath());
+            else if(pickerMultiple)toggleSelection(f);
+            else finishPicking(Collections.singletonList(f));
+            return;
+        }
+        if(isDir(f)){navigate(f.getAbsolutePath());return;}if(ext(f).equals("zip")){showZip(f);return;}if(isText(f)){previewText(f);return;}try{Intent i=new Intent(Intent.ACTION_VIEW);i.setDataAndType(fileUri(f),mime(f));i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivity(i);}catch(Exception e){toast("No app can open this file");}}
+    /** Enforce the MIME type(s) requested by the receiving application. */
+    private boolean pickerMimeMatches(File file){
+        String actual=mime(file);
+        if("*/*".equals(actual))actual="application/octet-stream";
+        for(String requested:pickerMimeTypes)
+            if(requested!=null && ClipDescription.compareMimeTypes(actual,requested))return true;
+        return false;
+    }
+    /** Return a readable, permission-granted document URI, never a file:// path. */
+    private void finishPicking(List<File> files){
+        if(files.isEmpty()){toast("Choose at least one file");return;}
+        try{
+            ClipData clip=null;
+            Uri first=null;
+            for(File file:files){
+                if(!file.isFile()||!file.canRead()||!pickerMimeMatches(file)){
+                    toast("Can't share " + file.getName());return;
+                }
+                Uri uri=SimpleDocumentsProvider.uriForFile(this,file);
+                if(first==null){first=uri;clip=ClipData.newUri(getContentResolver(),file.getName(),uri);}
+                else clip.addItem(new ClipData.Item(uri));
+            }
+            Intent result=new Intent();
+            result.setData(first);
+            result.setClipData(clip);
+            result.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            if(pickerDocuments)result.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+            setResult(RESULT_OK,result);
+            finish();
+        }catch(Exception e){toast("Unable to provide the file: " + e.getMessage());}
+    }
     private void setSort(int value){if(sort==value)descending=!descending;else{sort=value;descending=false;}savePrefs();render();}
     private void chooseSort(){new AlertDialog.Builder(this).setTitle("Sort by").setSingleChoiceItems(sortNames,sort,(d,n)->{setSort(n);d.dismiss();}).setPositiveButton(descending?"Use ascending":"Use descending",(d,w)->{descending=!descending;savePrefs();render();}).show();}
     private void savePrefs(){prefs.edit().putBoolean("grid",grid).putBoolean("hidden",showHidden).putInt("sort",sort).putBoolean("descending",descending).apply();}

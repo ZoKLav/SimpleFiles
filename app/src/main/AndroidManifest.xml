@@ -6,6 +6,40 @@
     <application android:allowBackup="true" android:label="@string/app_name" android:theme="@style/AppTheme" android:requestLegacyExternalStorage="true">
         <provider android:name=".LocalFileProvider" android:authorities="${applicationId}.files" android:exported="false" android:grantUriPermissions="true" />
         <activity android:name=".SettingsActivity" android:exported="false" />
+        <!-- Exposes shared storage to the system Storage Access Framework picker. -->
+        <provider
+            android:name=".SimpleDocumentsProvider"
+            android:authorities="${applicationId}.documents"
+            android:exported="true"
+            android:grantUriPermissions="true"
+            android:permission="android.permission.MANAGE_DOCUMENTS">
+            <intent-filter>
+                <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
+            </intent-filter>
+        </provider>
+        <!-- Also work when a ROM has no system file picker installed. -->
+        <activity android:name=".PickerActivity" android:exported="true" android:label="@string/picker_label">
+            <intent-filter>
+                <action android:name="android.intent.action.GET_CONTENT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.OPENABLE" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.OPEN_DOCUMENT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.OPENABLE" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+            <!-- Some gallery/upload flows use ACTION_PICK for media. -->
+            <intent-filter>
+                <action android:name="android.intent.action.PICK" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+                <data android:mimeType="video/*" />
+                <data android:mimeType="audio/*" />
+            </intent-filter>
+        </activity>
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
         </activity>
