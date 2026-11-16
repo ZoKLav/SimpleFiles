@@ -9,7 +9,7 @@ A file manager for Android 7.0+ that lets you manage your fucking files. Written
 - Multiple tabs with independent navigation history.
 - Back, Forward, Up, and Home controls.
 - Clickable breadcrumbs and an editable folder address.
-- Details list and large-icon views.
+- Details list and large-icon views with direct View and Sort controls.
 - Image thumbnails.
 - Sorting by name, modification date, size, or file type.
 - Ascending and descending order, with folders first.
@@ -21,7 +21,8 @@ A file manager for Android 7.0+ that lets you manage your fucking files. Written
 - Multi-select, Select all, and Clear selection.
 - Cut, Copy, Paste, Rename, Delete, and Share.
 - New-folder creation.
-- Three-dot menus for the current folder and individual items.
+- A permanent two-row command ribbon with drawn icons and labels.
+- Direct Cut, Copy, Paste, Rename, Delete, New folder, Share, Properties, and Pin buttons.
 - Selection-aware actions that disable themselves when they do not apply.
 - Clipboard status and faded icons for items waiting to be moved.
 - Paste conflict choices: keep both, skip existing items, or replace existing files.
@@ -29,11 +30,13 @@ A file manager for Android 7.0+ that lets you manage your fucking files. Written
 - Failed or skipped moves remain in the clipboard.
 - Filename validation and protection against renaming over an existing entry.
 
-Select your files, open the menu, and do the thing.
+Select your files with the checkboxes or a long press, then tap the button. The commands stay visible; unavailable actions are dimmed.
 
 ### Colors and appearance
 
-- Light and dark modes.
+- Light and dark modes, including app dialogs.
+- Dark-mode gray brightness from black to white, with automatic text contrast.
+- The gray slider sets page and panel shades together; individual color controls remain available.
 - Custom accent, folder-icon, file-icon, and toolbar-icon colors.
 - Custom background, panel, and text colors.
 - Separate background, panel, and text settings for light and dark modes.
@@ -44,9 +47,10 @@ Select your files, open the menu, and do the thing.
 
 ### Home and settings
 
-- A dedicated Settings screen.
+- A dedicated Settings screen with permanent “Developed by ZoeyKL” credit.
 - Home shortcuts for internal storage and common folders.
 - Pin and unpin your own folders.
+- Long-press a Home shortcut to open it in another tab.
 - Optional common-folder shortcuts.
 - Startup choices: Home, internal storage, Downloads, a custom folder, or the last visited folder.
 - Choose a default folder by browsing, entering its path, or using the current folder.
@@ -57,6 +61,7 @@ Select your files, open the menu, and do the thing.
 
 - ZIP archive listing and extraction.
 - Optional root browsing and file operations through `su`.
+- Root Mode switches in the browser and Settings; a successful grant is remembered between launches.
 - Android folder-provider access.
 - Opening files in compatible installed applications.
 - Single-file and multiple-file sharing.
@@ -72,6 +77,17 @@ Select your files, open the menu, and do the thing.
 **Android storage restrictions still apply.** Folder providers can also limit available operations, and a permission denial will remain a permission denial after you describe it as unacceptable.
 
 ## Changelog
+
+### 1.2.0
+
+- Replaced file-action menus with a permanent, selection-aware icon ribbon.
+- Kept Explorer-style tabs, navigation, breadcrumbs, and status in a vertical touch layout.
+- Added direct Settings, Refresh, View, Sort, and folder-provider controls.
+- Added persistent Root Mode switches with a background permission check.
+- Added a full-range dark gray brightness slider and applied the appearance palette to app dialogs.
+- Added permanent settings credit and developer attribution in every Java file.
+- Expanded code comments around navigation, selection, file operations, appearance, and provider access.
+- Removed the bundled Windows builder and helper scripts from the source package.
 
 ### 1.1.1
 
