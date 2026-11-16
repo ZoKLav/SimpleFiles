@@ -1,0 +1,13 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'com.zoeykl.SimpleFiles'
+    compileSdk rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId 'com.zoeykl.SimpleFiles'
+        minSdk 24
+        targetSdk 28
+        versionCode 4
+        versionName '1.2.0'
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_1_8; targetCompatibility JavaVersion.VERSION_1_8 }
+}
